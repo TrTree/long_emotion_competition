@@ -25,13 +25,13 @@ python -m vllm.entrypoints.openai.api_server \
 > --gpu-memory-utilization根据memory占用情况修改
 
 ```bash
-python -m src.runner_mc \
-    --config src/config.yaml \
+export HF_ENDPOINT=https://hf-mirror.com
+python -m src_mc.runner_mc --config src_mc/config.yaml \
     --data data/Conversations_Long.jsonl \
     --output outputs/Emotion_Conversatin_Result.jsonl
 ```
 
-首次运行会在 `indexes/` 目录生成 FAISS 索引与文本缓存；若需重新构建，可删除对应文件后再次执行。确保 `llm.endpoint` 指向可用的推理服务（默认 `http://127.0.0.1:8000/generate`），并满足 120–220 中文字或 80–150 英文词的回复长度约束。
+首次运行会在 `indexes/` 目录生成 FAISS 索引与文本缓存；若需重新构建，可删除对应文件后再次执行。确保 `llm.endpoint` 指向可用的推理服务（默认 `http://127.0.0.1:8000/v1/chat/completions`），并满足 120–220 中文字或 80–150 英文词的回复长度约束。
 
 ### 依赖安装（uv）
 
