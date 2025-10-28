@@ -1,4 +1,9 @@
-"""LLM interaction helpers for generation and self-judging."""
+"""与大语言模型交互的辅助函数。
+
+该模块负责：
+1. 封装聊天补全接口，统一请求参数；
+2. 生成咨询师回复；
+3. 调用督导模型对回复进行打分与二次润色。"""
 
 from __future__ import annotations
 
@@ -26,6 +31,16 @@ def _chat_completion(
     top_p: float,
     timeout: int = DEFAULT_TIMEOUT,
 ) -> str:
+    """直接调用聊天补全接口并返回文本结果。
+
+    参数说明：
+    * ``system_prompt`` / ``user_prompt``：系统与用户提示词；
+    * ``model`` / ``endpoint``：模型名称与推理服务地址；
+    * ``max_new_tokens``、``temperature``、``top_p``：生成控制参数；
+    * ``timeout``：请求超时时长。
+
+    返回值会在成功解析后去除首尾空白字符。"""
+    # 构造符合 OpenAI ChatCompletion 兼容格式的请求体
     payload = {
         "model": model,
         "messages": [
@@ -44,6 +59,7 @@ def _chat_completion(
         content = data["choices"][0]["message"]["content"]
     except (KeyError, IndexError) as exc:  # pragma: no cover - defensive
         raise RuntimeError(f"Invalid LLM response: {data}") from exc
+    # 最终仅返回模型文本，不携带多余空白
     return content.strip()
 
 
@@ -56,7 +72,11 @@ def generate_reply(
     temperature: float = 0.7,
     top_p: float = 0.95,
 ) -> str:
-    """Generate a counselor reply using the configured LLM endpoint."""
+    """Generate a counselor reply using the configured LLM endpoint.
+
+    使用指定的大模型接口生成咨询师回复。"""
+
+    # 生成前写入调试日志，方便排查接口调用问题
 
     LOGGER.debug("Generating reply via %s", endpoint)
     raw = _chat_completion(
@@ -68,6 +88,7 @@ def generate_reply(
         temperature,
         top_p,
     )
+    # 去除模型可能产生的 <think> 思维链包裹内容
     return strip_reasoning_prefix(raw)
 
 
@@ -85,11 +106,16 @@ def refine_with_judge(
     user_template: str | None = None,
     generation_kwargs: Optional[Dict] = None,
 ) -> str:
-    """Evaluate and optionally refine a draft reply using a judge model."""
+    """Evaluate and optionally refine a draft reply using a judge model.
 
+    调用督导模型判断回复是否达标，必要时根据建议进行润色。"""
+
+    # 默认生成参数在需要时补齐，避免调用方重复传参
     generation_kwargs = generation_kwargs or {}
 
     def call_judge(reply: str) -> Dict:
+        """调用督导模型并将 JSON 文本安全解析为字典。"""
+
         judge_prompt = judge_user_template.format(
             client_last=client_last,
             evidence=evidence,
@@ -113,6 +139,7 @@ def refine_with_judge(
     scores_payload = call_judge(draft)
     scores = scores_payload.get("scores", {})
     advice = scores_payload.get("advice", "")
+    # 只要有任一评分低于通过线，则认为需要润色
     need_refine = any(float(value) < float(min_pass) for value in scores.values()) if scores else False
 
     if not need_refine or max_refine <= 0:
@@ -131,6 +158,7 @@ def refine_with_judge(
             f"{current_reply}"
         )
         refined_prompt = f"{base_prompt}\n\n{refine_instruction}"
+        # 依据督导建议重新生成一版回复
         current_reply = generate_reply(
             system_prompt,
             refined_prompt,
@@ -144,6 +172,7 @@ def refine_with_judge(
         if attempt + 1 >= max_refine:
             break
 
+        # 针对新的回复再次进行打分，如满足要求则提前退出循环
         scores_payload = call_judge(current_reply)
         scores = scores_payload.get("scores", {})
         advice = scores_payload.get("advice", advice)

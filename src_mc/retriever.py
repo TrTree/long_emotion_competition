@@ -1,4 +1,7 @@
-"""Semantic retriever built on top of FAISS/Sentence-Transformers."""
+"""基于 FAISS / Sentence-Transformers 的语义检索器。
+
+主要负责将长对话切分成语义块、构建向量索引，并在推理时
+召回与来访者最新发言相关的历史上下文。"""
 
 from __future__ import annotations
 
@@ -23,12 +26,16 @@ LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class Chunk:
+    """对话片段数据结构，包含文本内容与元信息。"""
+
     text: str
     meta: Dict
 
 
 class Retriever:
-    """Semantic retriever for long counseling conversations."""
+    """Semantic retriever for long counseling conversations.
+
+    针对心理咨询场景进行定制，支持可选的 FAISS 加速检索。"""
 
     def __init__(
         self,
@@ -67,8 +74,11 @@ class Retriever:
 
     # ------------------------------------------------------------------
     def build_or_load(self, all_dialogs: Sequence[Dict]) -> None:
-        """Build or load an index from cached assets."""
+        """Build or load an index from cached assets.
 
+        根据输入对话构建索引，或在存在缓存时直接加载。"""
+
+        # 构建 / 加载缓存索引，避免重复计算嵌入
         index_exists = os.path.exists(self.index_path) if self.use_faiss else True
         store_exists = os.path.exists(self.store_path)
         emb_path = self._embedding_cache_path()
@@ -116,7 +126,9 @@ class Retriever:
 
     # ------------------------------------------------------------------
     def search(self, query: str, k: int = 4, prefer_client: bool = True) -> List[Dict]:
-        """Return a ranked list of context chunks."""
+        """Return a ranked list of context chunks.
+
+        输入查询语句，返回按照相似度排序的上下文片段列表。"""
 
         if not self._chunks:
             raise RuntimeError("Retriever not initialised. Call build_or_load first.")
@@ -133,6 +145,7 @@ class Retriever:
             LOGGER.warning("Retriever embeddings are empty; returning no context.")
             return []
 
+        # 使用余弦相似度（归一化后内积等价）排序候选片段
         similarities = np.dot(self._embeddings, query_emb[0])
         top_idx = np.argsort(similarities)[::-1][:k]
         scores = similarities[top_idx]
@@ -140,6 +153,8 @@ class Retriever:
 
     # ------------------------------------------------------------------
     def _gather_results(self, scores: Sequence[float], indices: Sequence[int], prefer_client: bool) -> List[Dict]:
+        """根据检索得分收集片段，并可对包含来访者内容加权。"""
+
         results: List[Dict] = []
         for score, idx in zip(scores, indices):
             if idx < 0 or idx >= len(self._chunks):
@@ -160,6 +175,8 @@ class Retriever:
 
     # ------------------------------------------------------------------
     def _build_chunks(self, dialogs: Sequence[Dict]) -> List[Chunk]:
+        """遍历所有对话并切分成定长片段。"""
+
         chunks: List[Chunk] = []
         token_pattern = re.compile(r"[\u4e00-\u9fff]|\w+|[^\s\w]")
 
@@ -174,6 +191,7 @@ class Retriever:
                 line = raw_line.strip()
                 if not line:
                     continue
+                # 使用基础分词器估算 token 数，同时标记是否来自来访者
                 tokens = token_pattern.findall(line)
                 lines.append((line, len(tokens), line.startswith("Client:")))
 
@@ -188,6 +206,7 @@ class Retriever:
                 nonlocal buffer, buffer_tokens, chunk_idx
                 if not buffer:
                     return
+                # 将缓冲区中的多轮对话合并成一个语义片段
                 text = "\n".join(item[0] for item in buffer)
                 contains_client = any(item[2] for item in buffer)
                 meta = {
@@ -204,6 +223,7 @@ class Retriever:
                     buffer_tokens = 0
                     return
 
+                # 构造重叠窗口，保留部分前文提高检索召回率
                 overlap: List[tuple[str, int, bool]] = []
                 overlap_tokens = 0
                 for item in reversed(buffer):

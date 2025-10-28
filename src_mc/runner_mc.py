@@ -1,4 +1,7 @@
-"""Entry point for the MC emotional intelligence pipeline."""
+"""MC 情绪关怀流水线的主入口脚本。
+
+负责加载配置、检索上下文、调用大模型生成回复，并按需触发
+督导模型进行自我审阅。"""
 
 from __future__ import annotations
 
@@ -18,11 +21,15 @@ LOGGER = logging.getLogger(__name__)
 
 
 def load_config(path: str) -> Dict[str, Any]:
+    """Load YAML 配置文件并解析为字典。"""
+
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
+    """构建命令行参数解析器，便于 CLI 使用。"""
+
     parser = argparse.ArgumentParser(
         description="Run the MC emotional conversation pipeline"
     )
@@ -61,6 +68,7 @@ def main() -> None:
     conversations = list(read_jsonl(data_path))
 
     retriever_cfg = cfg.get("mc", {})
+    # 根据配置初始化检索器，用于召回历史上下文
     retriever = Retriever(
         embed_model=retriever_cfg.get("embed_model", "BAAI/bge-m3"),
         use_faiss=retriever_cfg.get("use_faiss", True),
@@ -86,10 +94,12 @@ def main() -> None:
             outputs.append({"id": cid, "predicted_response": ""})
             continue
 
+        # 使用检索器找到与来访者最后一句话最相关的历史片段
         hits = retriever.search(client_last, k=retriever_cfg.get("retriever_topk", 4))
         evidence = "\n".join(hit["text"] for hit in hits) if hits else ""
 
         user_prompt = MC_USER_FMT.format(client_last=client_last, evidence=evidence)
+        # 先生成一版初稿，作为后续督导的输入
         draft = generate_reply(
             MC_SYSTEM,
             user_prompt,
@@ -102,6 +112,7 @@ def main() -> None:
 
         final = draft
         if judge_cfg.get("enable", False):
+            # 准备与生成模型一致的参数，确保润色时风格统一
             generation_kwargs = {
                 "max_new_tokens": llm_cfg.get("max_new_tokens", 220),
                 "temperature": llm_cfg.get("temperature", 0.7),
@@ -126,6 +137,7 @@ def main() -> None:
 
     output_dir = os.path.dirname(output_path) or "."
     os.makedirs(output_dir, exist_ok=True)
+    # 将全部结果写出为 JSONL，便于后续评估或提交
     write_jsonl(output_path, outputs)
     LOGGER.info("Saved %d responses to %s", len(outputs), output_path)
 
