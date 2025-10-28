@@ -71,3 +71,38 @@ def extract_language_hint(text: str) -> str:
     ascii_letters = re.findall(r"[A-Za-z]", text)
     return "zh" if len(chinese_chars) >= len(ascii_letters) else "en"
 
+
+def strip_reasoning_prefix(text: str) -> str:
+    """Remove any leading <think>...</think> reasoning blocks from a reply."""
+
+    if not text:
+        return text
+
+    cleaned = text
+
+    while True:
+        start = cleaned.find("<think>")
+        if start == -1:
+            break
+
+        end = cleaned.find("</think>", start)
+        if end != -1:
+            cleaned = cleaned[:start] + cleaned[end + len("</think>") :]
+            cleaned = cleaned.lstrip()
+            continue
+
+        after = cleaned[start + len("<think>") :]
+        double_newline = after.find("\n\n")
+        if double_newline != -1:
+            cleaned = cleaned[:start] + after[double_newline + 2 :]
+        else:
+            newline = after.find("\n")
+            if newline != -1:
+                cleaned = cleaned[:start] + after[newline + 1 :]
+            else:
+                cleaned = cleaned[:start]
+        cleaned = cleaned.lstrip()
+        break
+
+    return cleaned.strip()
+

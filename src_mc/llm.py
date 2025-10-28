@@ -9,6 +9,7 @@ from typing import Dict, Optional
 import requests
 
 from .prompts import MC_SYSTEM, MC_USER_FMT
+from .utils import strip_reasoning_prefix
 
 LOGGER = logging.getLogger(__name__)
 
@@ -58,7 +59,7 @@ def generate_reply(
     """Generate a counselor reply using the configured LLM endpoint."""
 
     LOGGER.debug("Generating reply via %s", endpoint)
-    return _chat_completion(
+    raw = _chat_completion(
         system_prompt,
         user_prompt,
         model,
@@ -67,6 +68,7 @@ def generate_reply(
         temperature,
         top_p,
     )
+    return strip_reasoning_prefix(raw)
 
 
 def refine_with_judge(
