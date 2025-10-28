@@ -15,6 +15,16 @@
 默认配置位于 `src/config.yaml`，包含检索分块、嵌入模型、LLM 接口以及自评审阈值等参数，可通过命令行覆盖：
 
 ```bash
+python -m vllm.entrypoints.openai.api_server \
+    --model /data/zhangjingwei/LL-Doctor-qwen3-8b-Model \
+    --host 0.0.0.0 --port 8000 \
+    --gpu-memory-utilization 0.65 \
+    --max-model-len 32768
+```
+
+> --gpu-memory-utilization根据memory占用情况修改
+
+```bash
 python -m src.runner_mc \
     --config src/config.yaml \
     --data data/Conversations_Long.jsonl \
