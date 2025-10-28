@@ -1,4 +1,6 @@
-"""Utility helpers for the MC pipeline."""
+"""Utility helpers for the MC pipeline.
+
+提供 JSONL 读写、文本处理等基础工具，供 MC 流水线复用。"""
 
 from __future__ import annotations
 
@@ -10,7 +12,9 @@ from typing import Dict, Generator, List
 
 
 def read_jsonl(path: str) -> Generator[Dict, None, None]:
-    """Yield dictionaries from a UTF-8 encoded JSONL file."""
+    """Yield dictionaries from a UTF-8 encoded JSONL file.
+
+    读取 JSON Lines 文件，每次返回一条记录的字典表示。"""
 
     if not os.path.exists(path):
         raise FileNotFoundError(path)
@@ -24,7 +28,9 @@ def read_jsonl(path: str) -> Generator[Dict, None, None]:
 
 
 def write_jsonl(path: str, records: Iterable[Dict]) -> None:
-    """Write an iterable of dictionaries to a JSONL file."""
+    """Write an iterable of dictionaries to a JSONL file.
+
+    将多条记录逐行写入目标文件，默认保留中文字符。"""
 
     directory = os.path.dirname(path)
     if directory:
@@ -35,19 +41,25 @@ def write_jsonl(path: str, records: Iterable[Dict]) -> None:
 
 
 def _basic_tokens(text: str) -> List[str]:
+    """使用简单的正则表达式进行粗粒度分词。"""
+
     pattern = re.compile(r"[\u4e00-\u9fff]|\w+|[^\s\w]")
     return pattern.findall(text)
 
 
 def tokenize_len(text: str) -> int:
-    """Estimate the approximate token length of text."""
+    """Estimate the approximate token length of text.
+
+    利用简单分词结果估算 token 数，供窗口控制使用。"""
 
     tokens = _basic_tokens(text)
     return len(tokens)
 
 
 def last_client_turn(dialog: str) -> str:
-    """Return the content of the last utterance prefixed with 'Client:'."""
+    """Return the content of the last utterance prefixed with 'Client:'.
+
+    遍历对话末尾，提取来访者最新一句话。"""
 
     if not dialog:
         return ""
@@ -62,7 +74,9 @@ def last_client_turn(dialog: str) -> str:
 
 
 def extract_language_hint(text: str) -> str:
-    """Rudimentary language detector returning 'zh' or 'en'."""
+    """Rudimentary language detector returning 'zh' or 'en'.
+
+    基于字符出现次数的启发式判断文本主要语言。"""
 
     if not text:
         return "zh"
@@ -73,7 +87,9 @@ def extract_language_hint(text: str) -> str:
 
 
 def strip_reasoning_prefix(text: str) -> str:
-    """Remove any leading <think>...</think> reasoning blocks from a reply."""
+    """Remove any leading <think>...</think> reasoning blocks from a reply.
+
+    清理模型输出中的显式思维链片段，确保回复干净。"""
 
     if not text:
         return text
