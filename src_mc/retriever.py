@@ -152,7 +152,9 @@ class Retriever:
         return self._gather_results(scores, top_idx, prefer_client)
 
     # ------------------------------------------------------------------
-    def _gather_results(self, scores: Sequence[float], indices: Sequence[int], prefer_client: bool) -> List[Dict]:
+    def _gather_results(
+        self, scores: Sequence[float], indices: Sequence[int], prefer_client: bool
+    ) -> List[Dict]:
         """根据检索得分收集片段，并可对包含来访者内容加权。"""
 
         results: List[Dict] = []
@@ -250,10 +252,17 @@ class Retriever:
         os.makedirs(os.path.dirname(self.store_path), exist_ok=True)
         with open(self.store_path, "w", encoding="utf-8") as f:
             for chunk in chunks:
-                f.write(json.dumps({"text": chunk.text, "meta": chunk.meta}, ensure_ascii=False) + "\n")
+                f.write(
+                    json.dumps(
+                        {"text": chunk.text, "meta": chunk.meta}, ensure_ascii=False
+                    )
+                    + "\n"
+                )
 
     # ------------------------------------------------------------------
-    def _load_cached(self, index_exists: bool, store_exists: bool, emb_exists: bool) -> None:
+    def _load_cached(
+        self, index_exists: bool, store_exists: bool, emb_exists: bool
+    ) -> None:
         if store_exists:
             with open(self.store_path, "r", encoding="utf-8") as f:
                 self._chunks = [Chunk(**json.loads(line)) for line in f if line.strip()]
@@ -267,4 +276,3 @@ class Retriever:
     def _embedding_cache_path(self) -> str:
         base, _ = os.path.splitext(self.index_path)
         return f"{base}_embeddings.npy"
-

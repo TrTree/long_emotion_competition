@@ -121,4 +121,3 @@ def strip_reasoning_prefix(text: str) -> str:
         break
 
     return cleaned.strip()
-

@@ -18,7 +18,7 @@
 python -m vllm.entrypoints.openai.api_server \
     --model /data/zhangjingwei/LL-Doctor-qwen3-8b-Model \
     --host 0.0.0.0 --port 8000 \
-    --gpu-memory-utilization 0.65 \
+    --gpu-memory-utilization 0.9 \
     --max-model-len 32768
 ```
 

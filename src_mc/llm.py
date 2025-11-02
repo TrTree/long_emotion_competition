@@ -26,7 +26,7 @@ def _chat_completion(
     user_prompt: str,
     model: str,
     endpoint: str,
-    max_new_tokens: int,
+    max_new_tokens: int | None,
     temperature: float,
     top_p: float,
     timeout: int = DEFAULT_TIMEOUT,
@@ -47,10 +47,11 @@ def _chat_completion(
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-        "max_tokens": max_new_tokens,
         "temperature": temperature,
         "top_p": top_p,
     }
+    if max_new_tokens is not None and max_new_tokens > 0:
+        payload["max_tokens"] = max_new_tokens
 
     response = requests.post(endpoint, json=payload, timeout=timeout)
     response.raise_for_status()
@@ -68,7 +69,7 @@ def generate_reply(
     user_prompt: str,
     model: str,
     endpoint: str,
-    max_new_tokens: int = 220,
+    max_new_tokens: int | None = 220,
     temperature: float = 0.7,
     top_p: float = 0.95,
 ) -> str:
@@ -140,13 +141,19 @@ def refine_with_judge(
     scores = scores_payload.get("scores", {})
     advice = scores_payload.get("advice", "")
     # 只要有任一评分低于通过线，则认为需要润色
-    need_refine = any(float(value) < float(min_pass) for value in scores.values()) if scores else False
+    need_refine = (
+        any(float(value) < float(min_pass) for value in scores.values())
+        if scores
+        else False
+    )
 
     if not need_refine or max_refine <= 0:
         return draft
 
     system_prompt = system_prompt or MC_SYSTEM
-    base_prompt = (user_template or MC_USER_FMT).format(client_last=client_last, evidence=evidence)
+    base_prompt = (user_template or MC_USER_FMT).format(
+        client_last=client_last, evidence=evidence
+    )
     current_reply = draft
 
     for attempt in range(max_refine):
@@ -176,9 +183,12 @@ def refine_with_judge(
         scores_payload = call_judge(current_reply)
         scores = scores_payload.get("scores", {})
         advice = scores_payload.get("advice", advice)
-        need_refine = any(float(value) < float(min_pass) for value in scores.values()) if scores else False
+        need_refine = (
+            any(float(value) < float(min_pass) for value in scores.values())
+            if scores
+            else False
+        )
         if not need_refine:
             break
 
     return current_reply
-
