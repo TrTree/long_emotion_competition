@@ -24,3 +24,8 @@ per_field_queries:
   predicted_treatment_process: "干预过程：评估-技术-作业-随访-家庭参与"
   predicted_illness_Characteristics: "病程特征：起病/波动/诱因-维持/风险保护"
   predicted_treatment_effect: "阶段性疗效/主观负荷/功能改善/复发或巩固"
+
+self_judge:
+  enable: true
+  min_pass_score: 3.5
+  max_refine: 1
